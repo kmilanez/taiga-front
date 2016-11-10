@@ -65,7 +65,7 @@ describe('wiki', function() {
         await utils.common.takeScreenshot("wiki", "deleting-the-created-link");
     });
 
-    describe.only('wiki editor', sharedWysiwyg.bind(this));
+    describe('wiki editor', sharedWysiwyg.bind(this));
 
     it('confirm close with ESC in lightbox', async function() {
         wikiHelper.editor().enabledEditionMode();

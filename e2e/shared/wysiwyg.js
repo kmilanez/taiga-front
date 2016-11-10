@@ -1,6 +1,9 @@
 var chai = require('chai');
 var chaiAsPromised = require('chai-as-promised');
 
+var detailHelper = require('../helpers').detail;
+var historyHelper = detailHelper.history();
+
 var utils = require('../utils');
 var EC = protractor.ExpectedConditions;
 
@@ -59,20 +62,22 @@ function cancelEdition() {
 }
 
 async function edit(elm, elmWrapper, text = null) {
-    browser.wait(EC.elementToBeClickable(elm), 10000);
+    await browser.wait(EC.elementToBeClickable(elm), 10000);
 
     elm.click();
 
     browser.sleep(200);
 
     browser.executeScript(function () {
-        var range = document.createRange();
-        range.setStart(arguments[0].firstChild, 0);
-        range.setEnd(arguments[0].lastChild, 0);
+        if(arguments[0].firstChild) {
+            var range = document.createRange();
+            range.setStart(arguments[0].firstChild, 0);
+            range.setEnd(arguments[0].lastChild, 0);
 
-        var sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
+            var sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
     }, elm.getWebElement());
 
     if (text !== null) {
@@ -97,7 +102,182 @@ async function cleanWysiwyg(elm, elmWrapper) {
     return htmlMode();
 }
 
-shared.wysiwygTesting = function() {
+shared.wysiwygTestingComments = function(parentSelector) {
+    var editor;
+    var editorWrapper;
+
+    beforeEach(() => {
+        let parent = $(parentSelector);
+        editor = parent.$('.medium');
+        editorWrapper = parent.$('tg-wysiwyg');
+    });
+
+    it('bold, test normal behavior and check markdown', async () => {
+        let commentsCounter = await historyHelper.countComments();
+
+        await edit(editor, editorWrapper, "test");
+        selectEditorFirstChild(editor);
+
+        $('.medium-editor-toolbar-active .medium-editor-action-bold').click();
+
+        resetSelection();
+
+        markdownMode();
+
+        let markdown = await getMarkdownText(editorWrapper);
+
+        expect(markdown).to.be.equal('**test**');
+
+        htmlMode();
+
+        saveEdition();
+
+        let newCommentsCounter = await historyHelper.countComments();
+        expect(newCommentsCounter).to.be.equal(commentsCounter+1);
+    });
+
+    it('convert to html', async () => {
+        let commentsCounter = await historyHelper.countComments();
+
+        await edit(editor, editorWrapper, '');
+
+        markdownMode();
+
+        let markdownTextarea = getMarkdownTextarea(editorWrapper);
+
+        await markdownTextarea.sendKeys('_test2_');
+
+        htmlMode();
+
+        let html = await editor.getInnerHtml();
+
+        expect(html).to.be.eql('<p><em>test2</em></p>\n');
+
+        saveEdition();
+
+        let newCommentsCounter = await historyHelper.countComments();
+        expect(newCommentsCounter).to.be.equal(commentsCounter+1);
+    });
+
+    it('code block', async () => {
+        await edit(editor, editorWrapper, '');
+
+        editor.sendKeys("var test = 2;");
+
+        selectEditorFirstChild(editor);
+
+        $('.medium-editor-toolbar-active .medium-editor-button-last').click();
+
+        $('.code-language-selector').click();
+        $('.code-language-search input').sendKeys('javascript');
+        $('.code-language-search li').click();
+
+        saveEdition();
+
+        let lastComment = historyHelper.getComments().last();
+
+        let hasHightlighter = !!await lastComment.$$('.token').count();
+
+        expect(hasHightlighter).to.be.true;
+    });
+
+    it('confirm exit when there is changes', async () => {
+        await edit(editor, editorWrapper, '');
+
+        editor.sendKeys('text text text');
+        editor.sendKeys(protractor.Key.ESCAPE);
+
+        await utils.lightbox.confirm.ok();
+
+        let isReadMode = !!await editorWrapper.$$('.read-mode').count();
+
+        expect(isReadMode).to.be.true;
+
+        let html = await editor.getText();
+
+        expect(html).not.to.be.eql('text text text');
+
+        cancelEdition();
+    });
+
+    it('keep changes on reload', async () => {
+        await edit(editor, editorWrapper, '');
+
+        editor.sendKeys('text text text');
+        editor.sendKeys(protractor.Key.ESCAPE);
+
+        browser.sleep(400);
+        browser.refresh();
+
+        let isReadMode = !!await editorWrapper.$$('.read-mode').count();
+
+        expect(isReadMode).to.be.false;
+
+        let html = await editor.getText();
+
+        expect(html).to.be.eql('text text text');
+
+        cancelEdition();
+    });
+
+    it('mention user', async () => {
+        await edit(editor, editorWrapper, '');
+
+        editor.sendKeys('@use');
+
+        $$('.medium-mention li').get(2).click();
+
+        let html = await editor.getInnerHtml();
+
+        expect(html).to.be.eql('<p><a href="/profile/user8">@user8</a>&nbsp;</p>');
+
+        markdownMode();
+
+        let markdown = await getMarkdownText(editorWrapper);
+
+        expect(markdown).to.be.equal('[@user8](/profile/user8)');
+
+        htmlMode();
+
+        cancelEdition();
+    });
+
+    it('emojis', async () => {
+        await edit(editor, editorWrapper, '');
+
+        editor.sendKeys(':smil');
+
+        $$('.medium-mention li').get(2).click();
+
+        let html = await editor.getInnerHtml();
+
+        expect(html).to.include('1f604.png');
+
+        markdownMode();
+
+        let markdown = await getMarkdownText(editorWrapper);
+
+        expect(markdown).to.be.equal(':smile:');
+
+        cancelEdition();
+    });
+
+    it('cancel', async () => {
+        let prevHtml = await editor.getInnerHtml();
+
+        await edit(editor, editorWrapper, 'xxx yyy zzz');
+
+        cancelEdition();
+
+        let html = await editor.getInnerHtml();
+
+        expect(html).to.be.equal(prevHtml);
+
+        cancelEdition();
+    });
+};
+
+shared.wysiwygTesting = function(parentSelector) {
     var editor;
     var editorWrapper;
 
@@ -126,15 +306,16 @@ shared.wysiwygTesting = function() {
     });
 
     before(() => {
-        editor = $('.medium');
-        editorWrapper = $('tg-wysiwyg');
+        let parent = $(parentSelector);
+        editor = parent.$('.medium');
+        editorWrapper = parent.$('tg-wysiwyg');
     });
 
     it('bold, test normal behavior and check markdown', async () => {
         await edit(editor, editorWrapper, "test");
         selectEditorFirstChild(editor);
 
-        $('.medium-editor-action-bold').click();
+        $('.medium-editor-toolbar-active .medium-editor-action-bold').click();
 
         resetSelection();
 
@@ -176,7 +357,7 @@ shared.wysiwygTesting = function() {
 
         selectEditorFirstChild(editor);
 
-        $('.medium-editor-button-last').click();
+        $('.medium-editor-toolbar-active .medium-editor-button-last').click();
 
         $('.code-language-selector').click();
         $('.code-language-search input').sendKeys('javascript');

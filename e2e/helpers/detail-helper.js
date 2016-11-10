@@ -179,16 +179,6 @@ helper.history = function() {
             await browser.waitForAngular();
         },
 
-        addComment: async function(comment) {
-            obj.writeComment(comment);
-            el.$('.save-comment').click();
-            await browser.waitForAngular();
-        },
-
-        writeComment: function(comment) {
-            el.$('textarea[tg-markitup]').sendKeys(comment);
-        },
-
         countComments: async function() {
             let comments = await el.$$(".comment-wrapper");
             return comments.length;
@@ -227,6 +217,10 @@ helper.history = function() {
             await browser.waitForAngular();
         },
 
+        getComments: function() {
+            return $$('tg-comment');
+        },
+
         showVersionsLastComment: async function() {
           el.$$(".comment-edited a").last().click();
           await browser.waitForAngular();
@@ -252,11 +246,11 @@ helper.history = function() {
             el.$$(".deleted-comment-wrapper .restore-comment").last().click();
             await browser.waitForAngular();
         }
-    }
+    };
 
     return obj;
 
-}
+};
 
 helper.block = function() {
     let el = $('tg-block-button');

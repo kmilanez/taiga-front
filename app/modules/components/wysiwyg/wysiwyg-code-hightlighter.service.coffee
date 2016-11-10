@@ -130,10 +130,6 @@ class WysiwygCodeHightlighterService
             $(document.body).off('.leave-search-codelan')
 
         clickedInSearchBox = (target) ->
-            console.log(search);
-            console.log(target);
-            console.log($(search).is(target));
-            console.log($(search).has(target).length == 0);
             return $(search).is(target) || !!$(search).has(target).length
 
         $(document.body).on 'mouseup.leave-search-codelan', (e) ->
@@ -145,10 +141,7 @@ class WysiwygCodeHightlighterService
             filter = e.currentTarget.value
             ul.innerHTML = @.getCodeLanHTML(filter)
 
-        console.log("kkkkkkkk")
-
         $(ul).on 'click', 'li', (e) ->
-            console.log("jjjjjj", e.currentTarget.innerText)
             cb(e.currentTarget.innerText)
             close()
 

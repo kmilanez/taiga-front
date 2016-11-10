@@ -1,6 +1,7 @@
 var utils = require('../../utils');
 var sharedDetail = require('../../shared/detail');
 var usDetailHelper = require('../../helpers').usDetail;
+var sharedWysiwyg = require('../../shared/wysiwyg').wysiwygTesting;
 
 var chai = require('chai');
 var chaiAsPromised = require('chai-as-promised');
@@ -30,7 +31,7 @@ describe('User story detail', function(){
 
     it('tags edition', sharedDetail.tagsTesting);
 
-    describe('description', sharedDetail.descriptionTesting);
+    describe('description', sharedWysiwyg.bind(this, '.duty-content'));
 
     it('status edition', sharedDetail.statusTesting.bind(this, 'Ready', 'In progress'));
 
